@@ -111,8 +111,8 @@
     </div>
     <div class="row">
       <div class="field full">
-        <label>Mailing Address</label>
-        <input type="text" id="address">
+        <label>Mailing Address <span class="req">*</span></label>
+        <input type="text" id="address" required>
       </div>
     </div>
     <div class="row">
@@ -401,6 +401,22 @@ function downloadCopy(pdfBytes, fileName){
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+/* ---------- REPORT HEIGHT TO PARENT PAGE (when embedded in an iframe) ---------- */
+function reportHeight() {
+  if (window.parent !== window) {
+    window.parent.postMessage(
+      { type: 'mooneyProsFormHeight', height: document.documentElement.scrollHeight },
+      '*'
+    );
+  }
+}
+window.addEventListener('load', reportHeight);
+window.addEventListener('resize', reportHeight);
+if (window.ResizeObserver) {
+  new ResizeObserver(reportHeight).observe(document.body);
+}
+// Status messages, validation, and layout shifts can all change height after load.
+setInterval(reportHeight, 800);
 </script>
 </body>
 </html>
