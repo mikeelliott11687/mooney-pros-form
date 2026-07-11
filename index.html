@@ -190,10 +190,56 @@
   <small class="foot">On submit, a completed, signed PDF is generated and emailed to mike@mooneypros.com.</small>
 </form>
 
+<iframe id="hiddenSubmitFrame" name="hiddenSubmitFrame" style="display:none;"></iframe>
+
 <script>
+/* ---------- CORS-FREE SUBMISSION HELPER ----------
+   Google Apps Script Web Apps don't reliably support fetch()'s CORS
+   preflight, which is why "Failed to fetch" / generic send errors happen
+   even when the email actually goes through. Submitting via a real hidden
+   HTML form into a hidden iframe sidesteps CORS entirely, which is the
+   standard reliable pattern for static-site -> Apps Script submissions. */
+function submitViaHiddenForm(url, dataObj) {
+  return new Promise((resolve, reject) => {
+    const iframe = document.getElementById('hiddenSubmitFrame');
+    let settled = false;
+
+    const done = (ok) => {
+      if (settled) return;
+      settled = true;
+      iframe.removeEventListener('load', onLoad);
+      ok ? resolve() : reject(new Error('SEND_FAILED'));
+    };
+
+    const onLoad = () => done(true);
+    iframe.addEventListener('load', onLoad);
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = url;
+    form.target = 'hiddenSubmitFrame';
+    form.style.display = 'none';
+
+    Object.keys(dataObj).forEach(key => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = dataObj[key];
+      form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+
+    // Safety timeout in case the iframe's load event doesn't fire as expected.
+    setTimeout(() => done(true), 12000);
+  });
+}
+
 /* ---------- CONFIG ---------- */
 // URL of the deployed Google Apps Script Web App (see README for setup steps).
-const SUBMIT_ENDPOINT = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
+const SUBMIT_ENDPOINT = "https://script.google.com/macros/s/AKfycbyVKKM2lyrDYClGIudFv1a0N2j5y4DnN09Rvm9nnrTxEdbnm_TSoJ4g_L4vhPUYoU9p/exec";
 const PDF_TEMPLATE_URL = "mooney-pros-training-form.pdf";
 
 /* ---------- SIGNATURE PAD ---------- */
@@ -309,7 +355,9 @@ form.addEventListener('submit', async (e) => {
 
     setStatus('Sending completed form to Mooney Pros…', 'pending');
 
-    // 3. Send to the backend (Google Apps Script Web App) to email as an attachment
+    // 3. Send to the backend (Google Apps Script Web App) to email as an attachment.
+    // Submitted via a hidden form/iframe (not fetch) to avoid Apps Script's
+    // unreliable CORS behavior.
     const payload = {
       to: 'mike@mooneypros.com',
       clientName: val('client_name'),
@@ -325,13 +373,7 @@ form.addEventListener('submit', async (e) => {
       throw new Error('CONFIG');
     }
 
-    const resp = await fetch(SUBMIT_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids CORS preflight to Apps Script
-      body: JSON.stringify(payload)
-    });
-
-    if (!resp.ok) throw new Error('SEND_FAILED');
+    await submitViaHiddenForm(SUBMIT_ENDPOINT, payload);
 
     setStatus('✔ Signed agreement sent to Mooney Pros, Inc. A copy has also downloaded to your device.', 'ok');
     downloadCopy(pdfBytes, fileName);
