@@ -193,48 +193,44 @@
 <iframe id="hiddenSubmitFrame" name="hiddenSubmitFrame" style="display:none;"></iframe>
 
 <script>
-/* ---------- CORS-FREE SUBMISSION HELPER ----------
-   Google Apps Script Web Apps don't reliably support fetch()'s CORS
-   preflight, which is why "Failed to fetch" / generic send errors happen
-   even when the email actually goes through. Submitting via a real hidden
-   HTML form into a hidden iframe sidesteps CORS entirely, which is the
-   standard reliable pattern for static-site -> Apps Script submissions. */
-function submitViaHiddenForm(url, dataObj) {
-  return new Promise((resolve, reject) => {
-    const iframe = document.getElementById('hiddenSubmitFrame');
-    let settled = false;
+/* ---------- SUBMISSION WITH READABLE SUCCESS/FAILURE ----------
+   POST text/plain JSON to the Apps Script web app (no CORS preflight).
+   Apps Script redirects to a googleusercontent echo URL; fetch follows it
+   and we read JSON. Accepts both {ok:true} and legacy {status:"success"|"error"}. */
+function parseAppsScriptAck(text) {
+  let data;
+  try { data = JSON.parse(text); } catch (e) {
+    throw new Error('BAD_RESPONSE');
+  }
+  if (data && data.ok === true) return { ok: true, data };
+  if (data && (data.status === 'success' || data.status === 'ok' || data.status === 'Success')) {
+    return { ok: true, data };
+  }
+  if (data && (data.ok === false || data.status === 'error' || data.status === 'Error')) {
+    const msg = data.message || data.error || 'Server rejected the submission.';
+    const err = new Error(msg);
+    err.code = 'SERVER';
+    err.payload = data;
+    throw err;
+  }
+  throw new Error('BAD_RESPONSE');
+}
 
-    const done = (ok) => {
-      if (settled) return;
-      settled = true;
-      iframe.removeEventListener('load', onLoad);
-      ok ? resolve() : reject(new Error('SEND_FAILED'));
-    };
-
-    const onLoad = () => done(true);
-    iframe.addEventListener('load', onLoad);
-
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = url;
-    form.target = 'hiddenSubmitFrame';
-    form.style.display = 'none';
-
-    Object.keys(dataObj).forEach(key => {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = key;
-      input.value = dataObj[key];
-      form.appendChild(input);
-    });
-
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
-
-    // Safety timeout in case the iframe's load event doesn't fire as expected.
-    setTimeout(() => done(true), 12000);
+async function submitToAppsScript(url, dataObj) {
+  // Primary: text/plain JSON body (simple request, readable JSON ACK).
+  const res = await fetch(url, {
+    method: 'POST',
+    redirect: 'follow',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(dataObj)
   });
+  const text = await res.text();
+  if (!res.ok) {
+    const err = new Error('HTTP_' + res.status);
+    err.code = 'HTTP';
+    throw err;
+  }
+  return parseAppsScriptAck(text);
 }
 
 /* ---------- CONFIG ---------- */
@@ -384,9 +380,7 @@ form.addEventListener('submit', async (e) => {
 
     setStatus('Sending completed form to Mooney Pros…', 'pending');
 
-    // 3. Send to the backend (Google Apps Script Web App) to email as an attachment.
-    // Submitted via a hidden form/iframe (not fetch) to avoid Apps Script's
-    // unreliable CORS behavior.
+    // 3. Send to Apps Script; require a readable JSON ACK before claiming success.
     const payload = {
       to: 'mike@mooneypros.com',
       clientName: val('client_name'),
@@ -402,7 +396,7 @@ form.addEventListener('submit', async (e) => {
       throw new Error('CONFIG');
     }
 
-    await submitViaHiddenForm(SUBMIT_ENDPOINT, payload);
+    await submitToAppsScript(SUBMIT_ENDPOINT, payload);
 
     setStatus('✔ Signed agreement sent to Mooney Pros, Inc. A copy has also downloaded to your device.', 'ok');
     downloadCopy(pdfBytes, fileName);
@@ -414,6 +408,10 @@ form.addEventListener('submit', async (e) => {
     console.error(err);
     if (err.message === 'CONFIG') {
       setStatus('Form is not yet connected to the email service. See setup instructions (SUBMIT_ENDPOINT needs to be set).', 'err');
+    } else if (err.message === 'BAD_RESPONSE') {
+      setStatus('The server responded, but not with a clear success signal. Please email mike@mooneypros.com directly to confirm.', 'err');
+    } else if (err.code === 'SERVER') {
+      setStatus('Send failed: ' + err.message + ' Please try again or email mike@mooneypros.com directly.', 'err');
     } else if (typeof PDFLib === 'undefined' || (err && String(err).includes('PDFLib'))) {
       setStatus('Form tools failed to load (PDF library). Please refresh and try again, or email mike@mooneypros.com directly.', 'err');
     } else {
