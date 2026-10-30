@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mooney Pros, Inc. — Flight Training Request & Service Agreement</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="vendor/pdf-lib.min.js"></script>
 <style>
   :root{
     --navy:#0b2545;
@@ -257,7 +257,20 @@ function resizeCanvas(){
   ctx.lineCap = 'round';
   ctx.strokeStyle = '#0b2545';
 }
-window.addEventListener('resize', () => { const d = canvas.toDataURL(); resizeCanvas(); });
+window.addEventListener('resize', () => {
+  const d = canvas.toDataURL();
+  const had = hasSignature;
+  resizeCanvas();
+  if (had) {
+    const img = new Image();
+    img.onload = () => {
+      const rect = canvas.getBoundingClientRect();
+      ctx.drawImage(img, 0, 0, rect.width, rect.height);
+      hasSignature = true;
+    };
+    img.src = d;
+  }
+});
 resizeCanvas();
 
 function pos(e){
@@ -294,9 +307,25 @@ function setStatus(msg, kind){
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  if (!hasSignature){
-    setStatus('Please draw your signature before submitting.', 'err');
+  if (typeof PDFLib === 'undefined') {
+    setStatus('Form tools failed to load (PDF library). Please refresh and try again, or email mike@mooneypros.com directly.', 'err');
     return;
+  }
+
+  const typedName = document.getElementById('signature_name').value.trim();
+  if (!hasSignature && !typedName){
+    setStatus('Please type your full legal name and draw your signature before submitting.', 'err');
+    return;
+  }
+  if (!hasSignature && typedName){
+    // Synthesize a simple text signature on the canvas so PDF stamping still works.
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = '28px "Segoe UI", Candara, Calibri, serif';
+    ctx.fillStyle = '#0b2545';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(typedName, 16, rect.height / 2);
+    hasSignature = true;
   }
 
   submitBtn.disabled = true;
@@ -385,8 +414,10 @@ form.addEventListener('submit', async (e) => {
     console.error(err);
     if (err.message === 'CONFIG') {
       setStatus('Form is not yet connected to the email service. See setup instructions (SUBMIT_ENDPOINT needs to be set).', 'err');
+    } else if (typeof PDFLib === 'undefined' || (err && String(err).includes('PDFLib'))) {
+      setStatus('Form tools failed to load (PDF library). Please refresh and try again, or email mike@mooneypros.com directly.', 'err');
     } else {
-      setStatus('Something went wrong sending the form. Please try again or email mike@mooneypros.com directly.', 'err');
+      setStatus('Something went wrong preparing or sending the form (' + (err && err.message ? err.message : 'unknown') + '). Please try again or email mike@mooneypros.com directly.', 'err');
     }
   } finally {
     submitBtn.disabled = false;
