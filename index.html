@@ -456,12 +456,13 @@ function downloadCopy(pdfBytes, fileName){
 }
 /* ---------- REPORT HEIGHT TO PARENT PAGE (when embedded in an iframe) ---------- */
 function reportHeight() {
-  if (window.parent !== window) {
-    window.parent.postMessage(
-      { type: 'mooneyProsFormHeight', height: document.documentElement.scrollHeight },
-      '*'
-    );
-  }
+  if (window.parent === window) return;
+  // Measure content bottom (not the iframe viewport) to avoid a grow-feedback loop.
+  const foot = document.querySelector('small.foot');
+  const formEl = document.getElementById('trainingForm');
+  const target = foot || formEl || document.body;
+  const bottom = Math.ceil(target.getBoundingClientRect().bottom + window.scrollY + 32);
+  window.parent.postMessage({ type: 'mooneyProsFormHeight', height: bottom }, '*');
 }
 window.addEventListener('load', reportHeight);
 window.addEventListener('resize', reportHeight);
