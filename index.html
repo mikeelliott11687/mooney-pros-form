@@ -201,10 +201,6 @@
     </div>
   </div>
 
-  <div class="hp-field" aria-hidden="true">
-    <label for="mp_hp_x7">Leave this field empty</label>
-    <input type="text" id="mp_hp_x7" name="mp_hp_x7" value="" tabindex="-1" autocomplete="new-password" data-lpignore="true" data-1p-ignore="true" data-form-type="other">
-  </div>
 
   <div class="turnstile-wrap" id="turnstile-wrap">
     <div id="turnstile-container"></div>
@@ -495,8 +491,7 @@ form.addEventListener('submit', async (e) => {
       trainingDates: val('training_dates'),
       fileName: fileName,
       pdfBase64: base64Pdf,
-      turnstileToken: getTurnstileToken(),
-      honeypot: (document.getElementById('mp_hp_x7') || {}).value || ''
+      turnstileToken: getTurnstileToken()
     };
 
     if (!SUBMIT_ENDPOINT || SUBMIT_ENDPOINT.startsWith('PASTE_')) {
