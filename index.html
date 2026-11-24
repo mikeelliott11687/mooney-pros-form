@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mooney Pros, Inc. — Flight Training Request & Service Agreement</title>
 <script src="vendor/pdf-lib.min.js"></script>
+<script>
+  window.onTurnstileReady = function () {
+    if (typeof initTurnstile === 'function') initTurnstile();
+  };
+</script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileReady" defer></script>
 <style>
   :root{
     --navy:#0b2545;
@@ -81,6 +87,16 @@
   .status.err{background:#fdecea; color:var(--error);}
   .req{color:var(--error);}
   small.foot{display:block; text-align:center; color:var(--muted); margin-top:10px; font-size:.78rem;}
+  .turnstile-wrap{margin:0 0 14px;}
+  /* Honeypot: visually hidden, still in the DOM so bots may fill it. */
+  .hp-field{
+    position:absolute !important;
+    left:-10000px !important;
+    top:auto !important;
+    width:1px !important;
+    height:1px !important;
+    overflow:hidden !important;
+  }
 </style>
 </head>
 <body>
@@ -185,6 +201,15 @@
     </div>
   </div>
 
+  <div class="hp-field" aria-hidden="true">
+    <label for="company_website">Company website</label>
+    <input type="text" id="company_website" name="company_website" value="" tabindex="-1" autocomplete="off">
+  </div>
+
+  <div class="turnstile-wrap" id="turnstile-wrap">
+    <div id="turnstile-container"></div>
+  </div>
+
   <button type="submit" class="submit-btn" id="submitBtn">Sign &amp; Send Completed Form</button>
   <div id="statusBox" class="status"></div>
   <small class="foot">On submit, a completed, signed PDF is generated and emailed to mike@mooneypros.com.</small>
@@ -262,6 +287,54 @@ async function submitToAppsScript(url, dataObj) {
 const SUBMIT_ENDPOINT = "https://script.google.com/macros/s/AKfycby1szElrRAWz9MyqvCpE8qQob7z7fZzzDt9GXdMWvYibwRnbNZthbtPUS4YBHR2OU7edg/exec";
 const PDF_TEMPLATE_URL = "mooney-pros-training-form.pdf";
 
+// Cloudflare Turnstile site key (this value is public).
+// Never put the Secret Key in this file.
+const TURNSTILE_SITE_KEY = '0x4AAAAAAGQ8wk9Ezt7tC0gg';
+
+function isTurnstileConfigured() {
+  return !!(TURNSTILE_SITE_KEY && TURNSTILE_SITE_KEY !== 'TURNSTILE_SITE_KEY');
+}
+
+let turnstileWidgetId = null;
+
+function initTurnstile() {
+  if (!isTurnstileConfigured()) return;
+  if (typeof turnstile === 'undefined') return;
+  if (turnstileWidgetId !== null) return;
+  const container = document.getElementById('turnstile-container');
+  if (!container) return;
+  turnstileWidgetId = turnstile.render(container, {
+    sitekey: TURNSTILE_SITE_KEY,
+    callback: function () {},
+    'expired-callback': function () {
+      resetTurnstileWidget();
+    },
+    'error-callback': function () {}
+  });
+  if (typeof reportHeight === 'function') reportHeight();
+}
+
+function getTurnstileToken() {
+  if (!isTurnstileConfigured()) return '';
+  if (typeof turnstile === 'undefined' || turnstileWidgetId === null) return '';
+  try {
+    return turnstile.getResponse(turnstileWidgetId) || '';
+  } catch (err) {
+    return '';
+  }
+}
+
+function resetTurnstileWidget() {
+  if (typeof turnstile === 'undefined' || turnstileWidgetId === null) return;
+  try {
+    turnstile.reset(turnstileWidgetId);
+  } catch (err) {}
+}
+
+if (typeof turnstile !== 'undefined') {
+  initTurnstile();
+}
+
 /* ---------- SIGNATURE PAD ---------- */
 const canvas = document.getElementById('sigPad');
 const ctx = canvas.getContext('2d');
@@ -330,6 +403,14 @@ form.addEventListener('submit', async (e) => {
   if (typeof PDFLib === 'undefined') {
     setStatus('Form tools failed to load (PDF library). Please refresh and try again, or email mike@mooneypros.com directly.', 'err');
     return;
+  }
+
+  if (isTurnstileConfigured()) {
+    const readyToken = getTurnstileToken();
+    if (!readyToken) {
+      setStatus('Please complete the verification check, then submit again.', 'err');
+      return;
+    }
   }
 
   const typedName = document.getElementById('signature_name').value.trim();
@@ -413,7 +494,9 @@ form.addEventListener('submit', async (e) => {
       daysRequested: val('days_requested'),
       trainingDates: val('training_dates'),
       fileName: fileName,
-      pdfBase64: base64Pdf
+      pdfBase64: base64Pdf,
+      turnstileToken: getTurnstileToken(),
+      honeypot: (document.getElementById('company_website') || {}).value || ''
     };
 
     if (!SUBMIT_ENDPOINT || SUBMIT_ENDPOINT.startsWith('PASTE_')) {
@@ -427,9 +510,11 @@ form.addEventListener('submit', async (e) => {
     form.reset();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     hasSignature = false;
+    resetTurnstileWidget();
 
   } catch (err) {
     console.error(err);
+    resetTurnstileWidget();
     if (err.message === 'CONFIG') {
       setStatus('Form is not yet connected to the email service. See setup instructions (SUBMIT_ENDPOINT needs to be set).', 'err');
     } else if (err.message === 'BAD_RESPONSE') {
