@@ -202,8 +202,8 @@
   </div>
 
   <div class="hp-field" aria-hidden="true">
-    <label for="company_website">Company website</label>
-    <input type="text" id="company_website" name="company_website" value="" tabindex="-1" autocomplete="off">
+    <label for="mp_hp_x7">Leave this field empty</label>
+    <input type="text" id="mp_hp_x7" name="mp_hp_x7" value="" tabindex="-1" autocomplete="new-password" data-lpignore="true" data-1p-ignore="true" data-form-type="other">
   </div>
 
   <div class="turnstile-wrap" id="turnstile-wrap">
@@ -496,7 +496,7 @@ form.addEventListener('submit', async (e) => {
       fileName: fileName,
       pdfBase64: base64Pdf,
       turnstileToken: getTurnstileToken(),
-      honeypot: (document.getElementById('company_website') || {}).value || ''
+      honeypot: (document.getElementById('mp_hp_x7') || {}).value || ''
     };
 
     if (!SUBMIT_ENDPOINT || SUBMIT_ENDPOINT.startsWith('PASTE_')) {
