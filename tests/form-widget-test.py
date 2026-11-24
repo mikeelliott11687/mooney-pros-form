@@ -9,6 +9,7 @@ mock Apps Script endpoint. Does not call the live /exec URL.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import socket
 import tempfile
@@ -73,10 +74,14 @@ def write_temp_form(site_key: str, endpoint: str) -> Path:
         shutil.copy(ROOT / name, tmp / name)
     shutil.copytree(ROOT / "vendor", tmp / "vendor")
     html = (tmp / "index.html").read_text()
-    html = html.replace(
-        "const TURNSTILE_SITE_KEY = 'TURNSTILE_SITE_KEY';",
+    html, nsub = re.subn(
+        r"const TURNSTILE_SITE_KEY = '[^']*';",
         "const TURNSTILE_SITE_KEY = '%s';" % site_key,
+        html,
+        count=1,
     )
+    if nsub != 1:
+        raise RuntimeError("Could not rewrite TURNSTILE_SITE_KEY in temp form")
     html = html.replace(
         'const SUBMIT_ENDPOINT = "https://script.google.com/macros/s/AKfycby1szElrRAWz9MyqvCpE8qQob7z7fZzzDt9GXdMWvYibwRnbNZthbtPUS4YBHR2OU7edg/exec";',
         'const SUBMIT_ENDPOINT = "%s";' % endpoint,

@@ -11,7 +11,7 @@ Owner account: n9427v@gmail.com
 
 The new script requires a Turnstile token only after the Script Property `TURNSTILE_SECRET` is set. Until then, it still accepts the current live form (no token), still rejects a filled honeypot, and always emails mike@mooneypros.com (it ignores any client `to` field).
 
-The form page renders the widget and blocks submit until there is a token only after you replace the placeholder `TURNSTILE_SITE_KEY` and publish the page.
+The form page renders the widget and blocks submit until there is a token once this branch (with the Site Key already set) is published.
 
 So: redeploy the script first, with the secret not set yet. Publish the site key second. Add the secret last, and only after you can see the widget on the live form.
 
@@ -47,18 +47,19 @@ Do this signed in as n9427v@gmail.com, the account that owns the web app. Do not
 7. Leave Script Properties alone for now. Do not add `TURNSTILE_SECRET` yet.
 8. Optional check: submit a short TEST entry on the current live form (still no widget). You should still get the success message, and mike@mooneypros.com should still get the email.
 
-## Step 3. Paste the Site Key and publish the form page
+## Step 3. Publish the form page (Site Key is already in this branch)
 
-1. In `index.html`, find the clearly marked constant:
+The public Site Key is already set in `index.html`:
 
-   `const TURNSTILE_SITE_KEY = 'TURNSTILE_SITE_KEY';`
+`const TURNSTILE_SITE_KEY = '0x4AAAAAAGQ8wk9Ezt7tC0gg';`
 
-2. Replace the placeholder `TURNSTILE_SITE_KEY` with your real Site Key. Do not use Cloudflare's dummy test keys on the live site.
-3. Merge or publish this change so GitHub Pages updates:
+Do not overwrite it with a dummy test key.
+
+1. After Step 2 (script redeployed, `TURNSTILE_SECRET` still not set), merge or publish this branch so GitHub Pages updates:
    - https://mikeelliott11687.github.io/mooney-pros-form/
    - and the iframe on https://www.mooneypros.com/contact.html
-4. Wait a minute, then hard-refresh both URLs.
-5. Confirm the Turnstile widget is visible on the form before you go to Step 4. If you still see the form with no widget, the Site Key is not live yet. Do not add the secret.
+2. Wait a minute, then hard-refresh both URLs.
+3. Confirm the Turnstile widget is visible on the form before you go to Step 4. If you still see the form with no widget, the page is not live yet. Do not add the secret.
 
 ## Step 4. Add the secret (this turns enforcement on)
 

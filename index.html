@@ -288,9 +288,8 @@ const SUBMIT_ENDPOINT = "https://script.google.com/macros/s/AKfycby1szElrRAWz9My
 const PDF_TEMPLATE_URL = "mooney-pros-training-form.pdf";
 
 // Cloudflare Turnstile site key (this value is public).
-// Replace the placeholder TURNSTILE_SITE_KEY with the Site Key from your
-// Cloudflare Turnstile widget. Never put the Secret Key in this file.
-const TURNSTILE_SITE_KEY = 'TURNSTILE_SITE_KEY';
+// Never put the Secret Key in this file.
+const TURNSTILE_SITE_KEY = '0x4AAAAAAGQ8wk9Ezt7tC0gg';
 
 function isTurnstileConfigured() {
   return !!(TURNSTILE_SITE_KEY && TURNSTILE_SITE_KEY !== 'TURNSTILE_SITE_KEY');

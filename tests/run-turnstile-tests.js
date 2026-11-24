@@ -155,7 +155,8 @@ async function main() {
   const index = fs.readFileSync(INDEX, 'utf8');
   const code = fs.readFileSync(CODE_GS, 'utf8');
   const siteKeyMatch = index.match(/const TURNSTILE_SITE_KEY = '([^']*)'/);
-  assert(siteKeyMatch && siteKeyMatch[1] === 'TURNSTILE_SITE_KEY', 'index.html site key is the placeholder');
+  assert(siteKeyMatch && siteKeyMatch[1] === '0x4AAAAAAGQ8wk9Ezt7tC0gg', 'index.html site key is the live public Site Key');
+  assert(siteKeyMatch[1] !== 'TURNSTILE_SITE_KEY', 'index.html no longer uses the placeholder');
   assert(!index.includes(DUMMY_PASS_SITE) && !index.includes(DUMMY_FAIL_SITE), 'index.html has no dummy site keys');
   assert(!index.includes(DUMMY_PASS_SECRET) && !code.includes(DUMMY_PASS_SECRET), 'committed files have no dummy secrets');
   assert(!code.includes('TURNSTILE_SECRET =') || /getProperty\('TURNSTILE_SECRET'\)/.test(code), 'secret is read from Script Properties');
